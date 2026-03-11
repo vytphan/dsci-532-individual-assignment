@@ -5,6 +5,18 @@ library(plotly)
 library(ggridges)
 library(ggplot2)
 
+close_df <- read.csv("data/close.csv")
+metric_df <- read.csv("data/metric.csv")
+spy_df <- read.csv("data/spy.csv")
+watchlist_df <- read.csv("data/watchlist.csv")
+
+close_df$Date <- as.Date(close_df$Date)
+spy_df$Date <- as.Date(spy_df$Date)
+watchlist_df$Date <- as.Date(watchlist_df$Date)
+
+DATE_MIN <- min(close_df$Date)
+DATE_MAX <- max(close_df$Date)
+
 ui <- page_fillable(
   title = "Magnificent 7 Stock Explorer",
 
