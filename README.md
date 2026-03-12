@@ -25,11 +25,18 @@ The app tracks key financial metrics for a portfolio composed of the Magnificent
 - Nvidia
 - Tesla
 
-Users can interactively:
+# How to Use the Dashboard:
 
-- Explore stock price trends
-- Flashcard of stock price 
-- Monitor a watchlist of selected stocks
+The dashboard has three panels:
+
+**1. Historical Closing Price Trend (top-left)**
+A line chart comparing the daily closing prices of all seven stocks over a chosen date range. Use the Select Date Range input to filter the view.
+
+**2. Stock Price Heatmap (top-center)**
+A heatmap showing daily price patterns across all seven stocks. Darker colours indicate higher prices; lighter colours indicate lower prices.
+
+**3. Watchlist & Alerts (top-right)**
+A quick-glance table of stocks you may want to monitor. The Change column highlights daily moves — red for losses, green for gains. Toggle Show % to switch between dollar and percentage change.
 
 ---
 
