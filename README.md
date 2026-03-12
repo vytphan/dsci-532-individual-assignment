@@ -28,9 +28,8 @@ The app tracks key financial metrics for a portfolio composed of the Magnificent
 Users can interactively:
 
 - Explore stock price trends
+- Flashcard of stock price 
 - Monitor a watchlist of selected stocks
-
-The goal of this assignment is to reproduce the core ideas of the original group project while implementing them in a different **Shiny language framework**.
 
 ---
 
@@ -38,25 +37,35 @@ The goal of this assignment is to reproduce the core ideas of the original group
 
 Follow these steps to run the dashboard locally.
 
-1. **Clone the repository**
+**1. Clone the repository**
+```bash
+git clone https://github.com/vytphan/dsci-532-individual-assignment.git
+```
+ 
+**2. Navigate to the repository folder**
+```bash
+cd dsci-532-individual-assignment
+```
+ 
+**3. Open the project in RStudio**
+```bash
+open dsci-532-individual-assignment.Rproj
+```
+ 
+This opens the project in RStudio and automatically sets the correct working directory.
+ 
+**4. Install required R packages**
+ 
+In the RStudio **Console**, run:
+```r
+install.packages(c("shiny", "tidyverse", "plotly", "DT", "bslib", "htmltools"))
+```
+ 
+**5. Run the Shiny app**
+ 
+In the RStudio **Console**, run:
+```r
+shiny::runApp("src")
+```
 
-   ```bash
-   git clone https://github.com/vytphan/dsci-532-individual-assignment.git
-   ```
-
-2. **Navigate to the repository folder:**
-   ```bash
-   cd dsci-532-individual-assignment
-   ```
-
-3. **Open R or RStudio and install required packages:**
-   ```bash
-   install.packages(c("shiny", "tidyverse", "plotly", "DT", "bslib", "htmltools"))
-   ```
-
-4. **Run the Shiny app:**
-   ```bash
-   shiny::runApp("src")
-   ```
-
-The dashboard will be available at the URL shown in the terminal (typically `http://127.0.0.1:3838`).
+The dashboard will be available at the URL shown in the terminal (typically `http://127.0.0.1:7872`).
