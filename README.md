@@ -6,8 +6,8 @@ Dashboard for tracking key financial metrics of a portfolio made up of the Magni
 
 # Live Demo
 
-- **Stable:**  
-- **Preview:**  
+- **Stable: https://019ce02a-f912-3b6c-77af-73a8546999ca.share.connect.posit.cloud/**  
+- **Preview: https://019ce02f-8dc5-1f90-9b7a-59075103d801.share.connect.posit.cloud/**  
 
 ---
 
@@ -28,8 +28,6 @@ The app tracks key financial metrics for a portfolio composed of the Magnificent
 Users can interactively:
 
 - Explore stock price trends
-- Compare performance across companies
-- View portfolio allocation
 - Monitor a watchlist of selected stocks
 
 The goal of this assignment is to reproduce the core ideas of the original group project while implementing them in a different **Shiny language framework**.
@@ -39,8 +37,6 @@ The goal of this assignment is to reproduce the core ideas of the original group
 # How to Run Locally
 
 Follow these steps to run the dashboard locally.
-
----
 
 1. Clone the repository
 
