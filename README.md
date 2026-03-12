@@ -38,11 +38,11 @@ The goal of this assignment is to reproduce the core ideas of the original group
 
 Follow these steps to run the dashboard locally.
 
-1. Clone the repository
+1. **Clone the repository**
 
-```bash
-git clone https://github.com/vytphan/dsci-532-individual-assignment.git
-```
+   ```bash
+   git clone https://github.com/vytphan/dsci-532-individual-assignment.git
+   ```
 
 2. **Navigate to the repository folder:**
    ```bash
@@ -51,7 +51,7 @@ git clone https://github.com/vytphan/dsci-532-individual-assignment.git
 
 3. **Open R or RStudio and install required packages:**
    ```bash
-   nstall.packages(c("shiny", "tidyverse", "plotly", "DT", "bslib", "htmltools"))
+   install.packages(c("shiny", "tidyverse", "plotly", "DT", "bslib", "htmltools"))
    ```
 
 4. **Run the Shiny app:**
