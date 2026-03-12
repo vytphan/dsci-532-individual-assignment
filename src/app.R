@@ -2,193 +2,83 @@ library(shiny)
 library(bslib)
 library(dplyr)
 library(plotly)
-library(ggridges)
-library(ggplot2)
+library(DT)
+library(htmltools)
 
-close_df <- read.csv("data/close.csv")
-metric_df <- read.csv("data/metric.csv")
-spy_df <- read.csv("data/spy.csv")
-watchlist_df <- read.csv("data/watchlist.csv")
+# Load data ------------------------------------------------------------------
+close_df <- read.csv("../data/close.csv", stringsAsFactors = FALSE)
+metric_df <- read.csv("../data/metric.csv", stringsAsFactors = FALSE)
+spy_df <- read.csv("../data/spy.csv", stringsAsFactors = FALSE)
+watchlist_df <- read.csv("../data/watchlist.csv", stringsAsFactors = FALSE)
 
 close_df$Date <- as.Date(close_df$Date)
 spy_df$Date <- as.Date(spy_df$Date)
-watchlist_df$Date <- as.Date(watchlist_df$Date)
 
-DATE_MIN <- min(close_df$Date)
-DATE_MAX <- max(close_df$Date)
-
-ui <- page_fillable(
-  title = "Magnificent 7 Stock Explorer",
-
-  tags$style(HTML("
-/* Finviz-style strip */
-.tickerstrip {
-  display: flex;
-  align-items: stretch;
-  border: 1px solid #2a2e39;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #1e222d;
+if ("Date" %in% names(watchlist_df)) {
+  watchlist_df$Date <- as.Date(watchlist_df$Date)
 }
 
-/* Each tile */
-.tickerbox {
-  flex: 1;
-  padding: 10px 10px 8px 10px;
-  min-width: 0;
-  text-align: left;
+DATE_MIN <- min(close_df$Date, na.rm = TRUE)
+DATE_MAX <- max(close_df$Date, na.rm = TRUE)
+
+stocks <- setdiff(names(close_df), "Date")
+
+# Make this match the actual ticker columns in watchlist.csv
+watchlist_dict <- c(
+  MU   = "Micron",
+  AMD  = "AMD",
+  NFLX = "Netflix",
+  INTC = "Intel",
+  QCOM = "Qualcomm",
+  CRM  = "Salesforce"
+)
+
+# CSS ------------------------------------------------------------------------
+dark_css <- HTML("
+body, .bslib-page-fill {
+  background-color: #131722 !important;
+  color: #d1d4dc !important;
 }
 
-/* Thin vertical separators between boxes */
-.tickerbox + .tickerbox {
-  border-left: 1px solid #2a2e39;
+.card {
+  background-color: #1e222d !important;
+  border: 1px solid #2a2e39 !important;
+  color: #d1d4dc !important;
+  height: 100%;
+  border-radius: 10px !important;
 }
 
-.tickerbox-ticker {
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: #d1d4dc;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-/* Price row */
-.tickerbox-price {
-  font-weight: 700;
-  font-size: 16px;
-  color: #ffffff;
-  line-height: 1.1;
-}
-
-/* Return row */
-.tickerbox-ret {
-  margin-top: 4px;
-  font-weight: 600;
-  font-size: 12px;
-  line-height: 1.1;
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.ret-pos { color: #44bb70; }
-.ret-neg { color: #d62728; }
-.ret-flat { color: #9aa0a6; }
-
-/* Arrow style */
-.ret-arrow {
-  font-size: 12px;
-  opacity: 0.95;
-}
-
-/* Subtle hover like finviz */
-.tickerbox:hover {
-  background: #232a37;
-}
-
-/* Small screens */
-@media (max-width: 900px) {
-  .tickerstrip {
-    overflow-x: auto;
-  }
-  .tickerbox {
-    flex: 0 0 140px;
-  }
-}
-
-/* Fix DataGrid hover in dark mode */
-.shiny-data-grid table tbody tr:hover {
-  background-color: #2a3a4a !important;
-  color: #ffffff !important;
-}
-
-.shiny-data-grid table tbody tr:hover td {
-  background-color: #2a3a4a !important;
-  color: #ffffff !important;
-}
-
-[data-row]:hover {
-  background-color: #2a3a4a !important;
-  color: #ffffff !important;
-}
-
-/* Card header title */
 .card-header {
+  background-color: #232837 !important;
+  color: #e5e7eb !important;
   font-size: 1rem !important;
+  font-weight: 700 !important;
+  border-bottom: 1px solid #2a2e39 !important;
+  padding: 14px 18px !important;
 }
 
-/* Labels and controls */
-label[for='metrics_sort_by'],
-label[for='metrics_sort_dir'] {
-  font-size: 0.875rem !important;
+.bslib-sidebar-layout > .sidebar {
+  background-color: #131722 !important;
+  border-right: 1px solid #2a2e39 !important;
 }
 
-/* Sort by */
-#metrics_sort_by {
-  font-size: 0.875rem !important;
-  background-color: #ffffff !important;
-  color: #000000 !important;
-  border: 1px solid #cccccc !important;
-}
-
-.selectize-control .selectize-dropdown {
-  font-size: 0.875rem !important;
-  background-color: #ffffff !important;
-  color: #000000 !important;
-}
-
-#metrics_sort_dir label {
-  font-size: 0.875rem !important;
-}
-
-/* Table cells */
-.shiny-data-grid table td,
-.shiny-data-grid table th {
-  font-size: 0.8125rem !important;
-}
-
-/* Risk-return dropdown */
-#rr_period + .selectize-control .selectize-input {
-  font-size: 0.875rem !important;
-}
-
-#rr_period + .selectize-control .selectize-dropdown {
-  font-size: 0.875rem !important;
-}
-
-/* Sidebar */
 .bslib-sidebar-layout .sidebar,
 .bslib-sidebar-layout .sidebar * {
   color: #d1d4dc !important;
 }
 
-.bslib-sidebar-layout .sidebar label,
-.bslib-sidebar-layout .sidebar .control-label,
-.bslib-sidebar-layout .sidebar .shiny-input-container label {
-  color: #d1d4dc !important;
-}
-
 .bslib-sidebar-layout .sidebar .form-control,
 .bslib-sidebar-layout .sidebar select,
-.bslib-sidebar-layout .sidebar textarea,
 .bslib-sidebar-layout .sidebar input {
   background-color: #1e222d !important;
   color: #d1d4dc !important;
   border: 1px solid #2a2e39 !important;
 }
 
-.bslib-sidebar-layout > .sidebar {
-  background-color: #131722 !important;
-}
-
 .bslib-sidebar-layout .sidebar .selectize-input {
   background-color: #1e222d !important;
   color: #ffffff !important;
-}
-
-.bslib-sidebar-layout .sidebar .selectize-input input {
-  color: #ffffff !important;
+  border: 1px solid #2a2e39 !important;
 }
 
 .bslib-sidebar-layout .sidebar .selectize-dropdown {
@@ -198,176 +88,170 @@ label[for='metrics_sort_dir'] {
 }
 
 .bslib-sidebar-layout .sidebar .selectize-dropdown .option {
+  background-color: #1e222d !important;
   color: #d1d4dc !important;
 }
 
-.bslib-sidebar-layout .sidebar .selectize-dropdown .option.active {
+.bslib-sidebar-layout .sidebar .selectize-dropdown .active {
   background-color: #1f6aa5 !important;
   color: #ffffff !important;
 }
-  ")),
 
-  layout_sidebar(
-    sidebar = sidebar(
-      "Sidebar inputs go here",
-      open = "desktop"
-    ),
-
-    "Main content goes here"
-  )
-)
-
-# -----------------------------------------------------------------------------
-# Reactive Data Calculations
-# -----------------------------------------------------------------------------
-
-filtered_close <- reactive({
-  req(input$dates)
-
-  close_df %>%
-    filter(Date >= as.Date(input$dates[1]),
-           Date <= as.Date(input$dates[2]))
-})
-
-current_price <- reactive({
-  req(input$ticker)
-
-  ticker <- input$ticker
-
-  if (!(ticker %in% names(close_df))) {
-    return(NULL)
-  }
-
-  as.numeric(tail(close_df[[ticker]], 1))
-})
-
-selected_stock_series <- reactive({
-  req(input$ticker)
-
-  ticker <- input$ticker
-  df <- filtered_close()
-
-  if (!(ticker %in% names(df))) {
-    return(numeric(0))
-  }
-
-  df %>%
-    select(Date, all_of(ticker))
-})
-
-rr_tickers <- setdiff(names(close_df), "Date")
-
-padded_range <- function(vals, pad_frac = 0.15) {
-  vals <- as.numeric(vals)
-  vals <- vals[!is.na(vals)]
-
-  if (length(vals) == 0) {
-    return(NULL)
-  }
-
-  vmin <- min(vals)
-  vmax <- max(vals)
-
-  if (isTRUE(all.equal(vmin, vmax))) {
-    pad <- ifelse(vmin != 0, abs(vmin) * pad_frac, 0.01)
-    return(c(vmin - pad, vmax + pad))
-  }
-
-  pad <- (vmax - vmin) * pad_frac
-  c(vmin - pad, vmax + pad)
+.nav-tabs {
+  background-color: #131722 !important;
+  border-bottom: 1px solid #2a2e39 !important;
 }
 
-analysis_close <- reactive({
-  req(input$dates, input$rr_period)
+.nav-tabs .nav-link {
+  color: #d1d4dc !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
 
-  df <- close_df %>%
-    filter(Date >= as.Date(input$dates[1]),
-           Date <= as.Date(input$dates[2])) %>%
-    arrange(Date)
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link {
+  background-color: #1e222d !important;
+  color: #ffffff !important;
+  border-color: #2a2e39 #2a2e39 #1e222d !important;
+}
 
-  if (nrow(df) == 0) {
-    return(df)
-  }
+.tab-content {
+  background-color: #131722 !important;
+}
 
-  period <- input$rr_period
+.chart-card {
+  min-height: 420px;
+}
 
-  if (period == "Full") {
-    return(df)
-  }
+.watchlist-card {
+  min-height: 420px;
+}
 
-  years <- c("1Y" = 1, "5Y" = 5, "10Y" = 10)[period]
-  end_date <- max(df$Date)
-  start_date <- end_date %m-% years(as.numeric(years))
+.watchlist-card .card-body {
+  padding: 16px 16px 10px 16px !important;
+}
 
-  df %>%
-    filter(Date >= start_date)
-})
+.watchlist-toggle-wrap {
+  margin-bottom: 14px;
+}
 
-risk_return_df <- reactive({
-  req(input$rr_period)
+.watchlist-toggle-wrap .shiny-input-container {
+  margin-bottom: 0 !important;
+}
 
-  df <- analysis_close()
-  period <- input$rr_period
+.watchlist-table-wrap {
+  border-top: 1px solid rgba(255,255,255,0.10);
+  padding-top: 10px;
+}
 
-  if (nrow(df) == 0) {
-    return(data.frame(Ticker = character(),
-                      AnnReturn = numeric(),
-                      AnnVol = numeric()))
-  }
+/* switch */
+.form-switch .form-check-input {
+  background-color: #d9d9d9 !important;
+  border-color: #d9d9d9 !important;
+}
 
-  prices <- df %>%
-    select(Date, all_of(rr_tickers))
+.form-switch .form-check-input:checked {
+  background-color: #1f6aa5 !important;
+  border-color: #1f6aa5 !important;
+}
 
-  if (period != "Full") {
-    years_n <- as.numeric(gsub("Y", "", period))
-    cutoff <- Sys.Date() %m-% years(years_n)
-    prices <- prices %>% filter(Date >= cutoff)
-  }
+.form-check-label {
+  color: #d1d4dc !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
 
-  prices_mat <- prices %>%
-    select(-Date)
+/* DT */
+table.dataTable {
+  background-color: transparent !important;
+  color: #d1d4dc !important;
+  border-collapse: collapse !important;
+  width: 100% !important;
+}
 
-  rets <- prices_mat / dplyr::lag(prices_mat) - 1
-  rets <- rets[-1, , drop = FALSE]
+table.dataTable thead th,
+table.dataTable thead td {
+  background-color: transparent !important;
+  color: #d1d4dc !important;
+  border-bottom: 1px solid rgba(255,255,255,0.18) !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  padding: 8px 6px !important;
+}
 
-  if (nrow(rets) == 0) {
-    return(data.frame(Ticker = character(),
-                      AnnReturn = numeric(),
-                      AnnVol = numeric()))
-  }
+table.dataTable tbody tr {
+  background-color: transparent !important;
+}
 
-  mean_daily <- sapply(rets, function(x) mean(x, na.rm = TRUE))
-  std_daily  <- sapply(rets, function(x) sd(x, na.rm = TRUE))
+table.dataTable tbody td {
+  background-color: transparent !important;
+  border-bottom: none !important;
+  font-size: 15px !important;
+  padding: 8px 6px !important;
+}
 
-  out <- data.frame(
-    Ticker = names(mean_daily),
-    AnnReturn = as.numeric(mean_daily) * 252,
-    AnnVol = as.numeric(std_daily) * sqrt(252)
-  )
+table.dataTable.no-footer {
+  border-bottom: none !important;
+}
 
-  out %>%
-    filter(!is.na(AnnReturn), !is.na(AnnVol))
-})
+.dataTables_wrapper .dataTables_scrollBody {
+  border-bottom: none !important;
+  background-color: transparent !important;
+}
 
-# ---- UI ----
+.dataTables_wrapper .dataTables_scrollHead {
+  border-bottom: none !important;
+}
+
+.dataTables_wrapper .dataTables_info,
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter,
+.dataTables_wrapper .dataTables_paginate {
+  color: #d1d4dc !important;
+}
+")
+
+# Helpers --------------------------------------------------------------------
+empty_plot <- function(msg) {
+  plot_ly() %>%
+    layout(
+      paper_bgcolor = "#131722",
+      plot_bgcolor = "#1e222d",
+      margin = list(l = 10, r = 10, t = 10, b = 10),
+      annotations = list(
+        list(
+          text = msg,
+          x = 0.5,
+          y = 0.5,
+          xref = "paper",
+          yref = "paper",
+          showarrow = FALSE,
+          font = list(color = "#d1d4dc", size = 14)
+        )
+      )
+    )
+}
+
+# UI -------------------------------------------------------------------------
 ui <- page_fillable(
-  title = "Magnificent 7 Stock Explorer",
-
-  tags$style(HTML("
-    .bslib-sidebar-layout > .sidebar {
-      background-color: #131722 !important;
-      color: #d1d4dc !important;
-    }
-  ")),
-
+  title = "Stock Explorer",
+  theme = bs_theme(
+    version = 5,
+    bg = "#131722",
+    fg = "#d1d4dc",
+    primary = "#1f6aa5",
+    secondary = "#2a2e39",
+    base_font = font_google("Inter", local = FALSE)
+  ),
+  tags$head(tags$style(dark_css)),
+  
   navset_tab(
     id = "main_tabs",
-
     nav_panel(
       "Dashboard",
-
       layout_sidebar(
         sidebar = sidebar(
+          bg = "#131722",
           dateRangeInput(
             inputId = "dates",
             label = "Select Date Range",
@@ -378,101 +262,119 @@ ui <- page_fillable(
             format = "yyyy-mm-dd",
             separator = " - "
           ),
-
           selectizeInput(
             inputId = "ticker",
-            label = "Select Stock",
+            label = "Highlight Ticker",
             choices = stocks,
-            selected = "AAPL"
-          )
+            selected = if ("AAPL" %in% stocks) "AAPL" else stocks[1]
+          ),
+          open = "desktop"
         ),
-
+        
         layout_columns(
-          col_widths = c(7, 3, 2),
-
+          col_widths = c(6, 3, 3),
+          
           card(
+            class = "chart-card",
             full_screen = TRUE,
             card_header("Historical Closing Price Trend"),
-            plotlyOutput("stock_price_chart")
+            card_body(
+              fill = TRUE,
+              plotlyOutput("price_series_chart", height = "100%")
+            )
+          ),
+          
+          card(
+            class = "chart-card",
+            full_screen = TRUE,
+            card_header("Portfolio Overview"),
+            card_body(
+              fill = TRUE,
+              plotlyOutput("current_price_treemap", height = "100%")
+            )
+          ),
+          
+          card(
+            class = "watchlist-card",
+            full_screen = TRUE,
+            card_header("Watchlist & Alerts"),
+            card_body(
+              div(
+                class = "watchlist-toggle-wrap",
+                input_switch("watchlist_toggle", "Show %", value = FALSE)
+              ),
+              div(
+                class = "watchlist-table-wrap",
+                DTOutput("watchlist_table")
+              )
+            )
           )
-
-          # add your other cards here
-          # ,card(...)
-          # ,card(...)
         )
       )
     )
   )
 )
 
-# ---- Server ----
+# Server ---------------------------------------------------------------------
 server <- function(input, output, session) {
-
+  
   filtered_close <- reactive({
     req(input$dates)
-
     close_df %>%
-      filter(
-        Date >= as.Date(input$dates[1]),
-        Date <= as.Date(input$dates[2])
-      )
+      filter(Date >= as.Date(input$dates[1]), Date <= as.Date(input$dates[2])) %>%
+      arrange(Date)
   })
-
-  output$stock_price_chart <- renderPlotly({
-    req(input$ticker)
-
-    ticker <- input$ticker
+  
+  # 1) Historical Closing Price Trend --------------------------------------------------
+  output$price_series_chart <- renderPlotly({
     df <- filtered_close()
-
-    if (nrow(df) == 0 || !(ticker %in% names(df))) {
-      fig <- plot_ly()
-      fig <- fig %>% layout(
-        template = "plotly_dark",
-        autosize = TRUE,
-        paper_bgcolor = "#131722",
-        plot_bgcolor = "#1e222d",
-        margin = list(l = 10, r = 10, t = 10, b = 10),
-        annotations = list(
-          list(
-            text = "No data available for the selected range/ticker.",
-            x = 0.5, y = 0.5,
-            xref = "paper", yref = "paper",
-            showarrow = FALSE,
-            font = list(color = "#d1d4dc", size = 14)
+    
+    if (is.null(df) || nrow(df) == 0) {
+      return(empty_plot("No data available for the current filter."))
+    }
+    
+    if (!("Date" %in% names(df)) || ncol(df) < 2) {
+      return(empty_plot("No stock columns to plot."))
+    }
+    
+    ticker_cols <- setdiff(names(df), "Date")
+    if (length(ticker_cols) == 0) {
+      return(empty_plot("No stock columns to plot."))
+    }
+    
+    selected_ticker <- input$ticker
+    
+    fig <- plot_ly()
+    
+    for (col in ticker_cols) {
+      is_selected <- identical(col, selected_ticker)
+      
+      line_color <- if (is_selected) {
+        "#4da3ff"
+      } else {
+        "rgba(209, 212, 220, 0.22)"
+      }
+      
+      line_width <- if (is_selected) 3 else 1.25
+      
+      fig <- fig %>%
+        add_lines(
+          data = df,
+          x = ~Date,
+          y = as.formula(paste0("~`", col, "`")),
+          name = col,
+          line = list(color = line_color, width = line_width),
+          opacity = if (is_selected) 1 else 0.9,
+          hovertemplate = paste0(
+            "<b>%{x|%Y-%m-%d}</b><br>",
+            col,
+            ": $%{y:.2f}<extra></extra>"
           )
         )
-      )
-      return(fig)
     }
-
-    df <- df %>% arrange(Date)
-    x <- df$Date
-    y <- as.numeric(df[[ticker]])
-
-    start_price <- y[1]
-    end_price <- y[length(y)]
-    pct_change <- if (!is.na(start_price) && start_price != 0) {
-      (end_price / start_price - 1) * 100
-    } else {
-      0
-    }
-
-    pct_color <- if (pct_change >= 0) "#44bb70" else "#d62728"
-
-    plot_ly(
-      data = df,
-      x = ~Date,
-      y = as.formula(paste0("~`", ticker, "`")),
-      type = "scatter",
-      mode = "lines",
-      line = list(color = "#2962ff", width = 2.5),
-      hovertemplate = paste0(
-        "<b>%{x|%Y-%m-%d}</b><br>",
-        ticker, ": $%{y:.2f}<extra></extra>"
-      )
-    ) %>%
+    
+    fig %>%
       layout(
-        template = "plotly_dark",
         paper_bgcolor = "#131722",
         plot_bgcolor = "#1e222d",
         margin = list(l = 10, r = 10, t = 30, b = 10),
@@ -480,9 +382,7 @@ server <- function(input, output, session) {
         xaxis = list(
           title = "Date",
           showgrid = TRUE,
-          gridcolor = "rgba(255,255,255,0.06)",
-          rangeslider = list(visible = TRUE),
-          rangeselector = NULL
+          gridcolor = "rgba(255,255,255,0.06)"
         ),
         yaxis = list(
           title = "Close Price ($)",
@@ -490,184 +390,189 @@ server <- function(input, output, session) {
           gridcolor = "rgba(255,255,255,0.06)",
           tickprefix = "$"
         ),
-        title = list(
-          text = paste0(
-            ticker,
-            " Close Price  <span style='color:",
-            pct_color,
-            "; font-size:12px;'>(",
-            sprintf("%+.2f", pct_change),
-            "%)</span>"
-          ),
-          x = 0.01,
-          xanchor = "left",
-          font = list(size = 16, color = "#d1d4dc")
-        ),
-        showlegend = FALSE
+        showlegend = TRUE,
+        font = list(color = "#d1d4dc")
+      )
+  })
+  # 2) Portfolio Overview Treemap --------------------------------------------
+  output$current_price_treemap <- renderPlotly({
+    df <- filtered_close()
+    req(input$ticker)
+    
+    if (is.null(df) || nrow(df) < 2) {
+      return(empty_plot("Need at least 2 rows to compute daily change."))
+    }
+    
+    if (nrow(metric_df) == 0 || !all(c("Ticker", "MarketCap") %in% names(metric_df))) {
+      return(empty_plot("metric.csv must contain Ticker and MarketCap columns."))
+    }
+    
+    cur <- df[nrow(df), , drop = FALSE]
+    prev <- df[nrow(df) - 1, , drop = FALSE]
+    selected_ticker <- input$ticker
+    
+    GREEN <- "#44bb70"
+    RED   <- "#d62728"
+    GRAY  <- "#787b86"
+    DIM_OPACITY <- 0.45
+    
+    labels <- c()
+    values <- c()
+    colors <- c()
+    text_colors <- c()
+    prices <- c()
+    pcts <- c()
+    text_info <- c()
+    
+    for (i in seq_len(nrow(metric_df))) {
+      ticker <- as.character(metric_df$Ticker[i])
+      
+      if (!(ticker %in% names(cur)) || !(ticker %in% names(prev))) next
+      
+      current <- suppressWarnings(as.numeric(cur[[ticker]]))
+      previous <- suppressWarnings(as.numeric(prev[[ticker]]))
+      market_cap <- suppressWarnings(as.numeric(metric_df$MarketCap[i]))
+      
+      if (is.na(current) || is.na(previous) || is.na(market_cap) || previous == 0) next
+      
+      pct <- (current / previous - 1) * 100
+      
+      if (pct > 0) {
+        base_color <- GREEN
+        arrow <- "\u25B2"
+      } else if (pct < 0) {
+        base_color <- RED
+        arrow <- "\u25BC"
+      } else {
+        base_color <- GRAY
+        arrow <- "\u2022"
+      }
+      
+      rgb_vals <- col2rgb(base_color)
+      
+      fill_color <- if (ticker == selected_ticker) {
+        base_color
+      } else {
+        sprintf("rgba(%d,%d,%d,%.2f)", rgb_vals[1], rgb_vals[2], rgb_vals[3], DIM_OPACITY)
+      }
+      
+      text_color <- if (ticker == selected_ticker) "#ffffff" else "#33414b"
+      
+      labels <- c(labels, ticker)
+      values <- c(values, market_cap)
+      colors <- c(colors, fill_color)
+      text_colors <- c(text_colors, text_color)
+      prices <- c(prices, current)
+      pcts <- c(pcts, pct)
+      text_info <- c(text_info, sprintf("%s<br>$%.2f %s %+.2f%%", ticker, current, arrow, pct))
+    }
+    
+    if (length(labels) == 0) {
+      return(empty_plot("No instruments available to plot."))
+    }
+    
+    plot_ly(
+      type = "treemap",
+      labels = labels,
+      parents = rep("", length(labels)),
+      values = values,
+      text = text_info,
+      textinfo = "text",
+      textposition = "middle center",
+      marker = list(
+        colors = colors,
+        line = list(color = "#2a2e39", width = 2)
+      ),
+      customdata = Map(function(price, pct) list(price, pct), prices, pcts),
+      hovertemplate = paste0(
+        "<b>%{label}</b><br>",
+        "Price: $%{customdata[0]:.2f}<br>",
+        "Change: %{customdata[1]:+.2f}%<extra></extra>"
+      ),
+      pathbar = list(visible = FALSE),
+      tiling = list(pad = 4)
+    ) %>%
+      style(
+        textfont = list(color = text_colors, size = 18)
+      ) %>%
+      layout(
+        paper_bgcolor = "#131722",
+        plot_bgcolor = "#1e222d",
+        font = list(color = "#d1d4dc"),
+        margin = list(l = 10, r = 10, t = 10, b = 10)
+      )
+  })
+  
+  # 3) Watchlist --------------------------------------------------------------
+  output$watchlist_table <- renderDT({
+    validate(
+      need(nrow(watchlist_df) >= 2, "Need at least 2 rows in watchlist.csv.")
+    )
+    
+    current_prices <- watchlist_df[nrow(watchlist_df), , drop = FALSE]
+    previous_prices <- watchlist_df[nrow(watchlist_df) - 1, , drop = FALSE]
+    
+    watchlist_data <- lapply(names(watchlist_dict), function(ticker) {
+      if (!(ticker %in% names(current_prices)) || !(ticker %in% names(previous_prices))) {
+        return(NULL)
+      }
+      
+      current <- suppressWarnings(as.numeric(current_prices[[ticker]]))
+      previous <- suppressWarnings(as.numeric(previous_prices[[ticker]]))
+      
+      if (is.na(current) || is.na(previous) || previous == 0) {
+        return(NULL)
+      }
+      
+      dollar_change <- current - previous
+      percent_change <- (dollar_change / previous) * 100
+      
+      change_value <- if (isTRUE(input$watchlist_toggle)) {
+        sprintf("%+.2f%%", percent_change)
+      } else {
+        sprintf("$%+.2f", dollar_change)
+      }
+      
+      data.frame(
+        Symbol = ticker,
+        Change = change_value,
+        RawChange = dollar_change,
+        stringsAsFactors = FALSE
+      )
+    }) %>%
+      bind_rows()
+    
+    validate(
+      need(nrow(watchlist_data) > 0, "No matching ticker columns found in watchlist.csv.")
+    )
+    
+    datatable(
+      watchlist_data[, c("Symbol", "Change", "RawChange")],
+      rownames = FALSE,
+      escape = FALSE,
+      selection = "none",
+      class = "display compact",
+      options = list(
+        dom = "t",
+        paging = FALSE,
+        searching = FALSE,
+        ordering = FALSE,
+        info = FALSE,
+        autoWidth = TRUE,
+        scrollY = "260px",
+        columnDefs = list(
+          list(visible = FALSE, targets = 2)
+        )
+      )
+    ) %>%
+      formatStyle(
+        columns = c("Symbol", "Change"),
+        valueColumns = "RawChange",
+        color = styleInterval(0, c("#ff2d2d", "#44bb70")),
+        fontWeight = "600",
+        backgroundColor = "transparent"
       )
   })
 }
 
-# ---- UI card ----
-card(
-  card_header("Portfolio Overview"),
-  plotlyOutput("current_price_treemap")
-)
-
-# ---- Server output ----
-output$current_price_treemap <- renderPlotly({
-  req(input$ticker)
-
-  selected_ticker <- input$ticker
-  cur <- close_df[nrow(close_df), ]
-  prev <- close_df[nrow(close_df) - 1, ]
-
-  GREEN <- "#44bb70"
-  RED <- "#d62728"
-  GRAY <- "#787b86"
-  DIM_OPACITY <- 0.45
-
-  labels <- c()
-  values <- c()
-  text_info <- c()
-  colors <- c()
-  custom_price <- c()
-  custom_pct <- c()
-
-  for (i in seq_len(nrow(metric_df))) {
-    ticker <- as.character(metric_df$Ticker[i])
-
-    if (!(ticker %in% names(close_df))) next
-
-    market_cap <- metric_df$MarketCap[i]
-    current <- as.numeric(cur[[ticker]])
-    previous <- as.numeric(prev[[ticker]])
-
-    pct <- if (is.na(previous) || previous == 0) {
-      0
-    } else {
-      (current / previous - 1) * 100
-    }
-
-    if (pct > 0.05) {
-      base_color <- GREEN
-      arrow <- "\u25B2"
-    } else if (pct < -0.05) {
-      base_color <- RED
-      arrow <- "\u25BC"
-    } else {
-      base_color <- GRAY
-      arrow <- "\u2022"
-    }
-
-    is_selected <- ticker == selected_ticker
-
-    if (is_selected) {
-      fill_color <- base_color
-    } else {
-      rgb <- col2rgb(base_color)
-      fill_color <- sprintf(
-        "rgba(%d,%d,%d,%.2f)",
-        rgb[1], rgb[2], rgb[3], DIM_OPACITY
-      )
-    }
-
-    labels <- c(labels, ticker)
-    values <- c(values, market_cap)
-    text_info <- c(text_info, sprintf("$%s %s%.2f%%", format(round(current, 2), big.mark = ","), arrow, pct))
-    colors <- c(colors, fill_color)
-    custom_price <- c(custom_price, current)
-    custom_pct <- c(custom_pct, pct)
-  }
-
-  customdata <- cbind(custom_price, custom_pct)
-
-  plot_ly(
-    type = "treemap",
-    labels = labels,
-    parents = rep("", length(labels)),
-    values = values,
-    text = text_info,
-    textposition = "middle center",
-    customdata = customdata,
-    marker = list(
-      colors = colors,
-      line = list(color = "#2a2e39", width = 2)
-    ),
-    hovertemplate = paste0(
-      "<b>%{label}</b><br>",
-      "Price: $%{customdata[0]:,.2f}<br>",
-      "Change: %{customdata[1]:+.2f}%<br>",
-      "Market Cap: $%{value:,.0f}<extra></extra>"
-    )
-  ) %>%
-    layout(
-      paper_bgcolor = "#131722",
-      plot_bgcolor = "#1e222d",
-      font = list(color = "#d1d4dc", size = 14),
-      margin = list(l = 10, r = 10, t = 10, b = 10)
-    )
-})
-
-# ---- UI card ----
-card(
-  card_header("Watchlist & Alerts"),
-  input_switch("watchlist_toggle", "Show as $ or %", value = FALSE),
-  DTOutput("watchlist_table")
-)
-
-# ---- Server output ----
-output$watchlist_table <- renderDT({
-  req(nrow(watchlist_df) >= 2)
-
-  current_prices <- watchlist_df[nrow(watchlist_df), ]
-  previous_prices <- watchlist_df[nrow(watchlist_df) - 1, ]
-
-  watchlist_data <- lapply(names(watchlist_dict), function(ticker) {
-    current <- as.numeric(current_prices[[ticker]])
-    previous <- as.numeric(previous_prices[[ticker]])
-
-    dollar_change <- current - previous
-    percent_change <- if (!is.na(previous) && previous != 0) {
-      (dollar_change / previous) * 100
-    } else {
-      NA_real_
-    }
-
-    change_value <- if (isTRUE(input$watchlist_toggle)) {
-      sprintf("%+.2f%%", percent_change)
-    } else {
-      sprintf("$%+.2f", dollar_change)
-    }
-
-    data.frame(
-      Symbol = ticker,
-      Change = change_value,
-      RawChange = dollar_change,
-      stringsAsFactors = FALSE
-    )
-  }) %>%
-    bind_rows()
-
-  datatable(
-    watchlist_data %>% select(Symbol, Change),
-    rownames = FALSE,
-    escape = FALSE,
-    options = list(
-      dom = "t",
-      paging = FALSE,
-      searching = FALSE,
-      ordering = FALSE
-    )
-  ) %>%
-    formatStyle(
-      columns = c("Symbol", "Change"),
-      valueColumns = "RawChange",
-      color = styleInterval(0, c("#d62728", "#44bb70")),
-      fontWeight = "600",
-      backgroundColor = "transparent"
-    )
-})
-
-# Create app
 shinyApp(ui = ui, server = server)
